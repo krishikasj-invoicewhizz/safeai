@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <meta name="description" content="SafeHer AI – AI-powered safety platform for women" />
+  <title>SafeHer AI</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, onSnapshot, doc, setDoc, getDoc, where } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-storage.js";
+
+    // ─── PASTE YOUR FIREBASE CONFIG HERE ───────────────────────────────────────
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    // ───────────────────────────────────────────────────────────────────────────
+
+    const app = initializeApp(firebaseConfig);
+    window._fb = {
+      auth: getAuth(app),
+      db: getFirestore(app),
+      storage: getStorage(app),
+      fns: { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, collection, addDoc, getDocs, query, orderBy, limit, onSnapshot, doc, setDoc, getDoc, where }
+    };
+    window.dispatchEvent(new Event("firebase-ready"));
+  </script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     SPLASH SCREEN
+══════════════════════════════════════════════ -->
+<div id="splash" class="splash">
+  <div class="splash-logo">
+    <div class="splash-shield">
+      <i class="fa-solid fa-shield-heart"></i>
+    </div>
+    <h1>SafeHer<span>AI</span></h1>
+    <p>Your AI-powered safety companion</p>
+  </div>
+  <div class="splash-loader"><span></span><span></span><span></span></div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     AUTH SCREEN
+══════════════════════════════════════════════ -->
+<div id="auth-screen" class="screen hidden">
+  <div class="auth-bg">
+    <div class="auth-blob blob1"></div>
+    <div class="auth-blob blob2"></div>
+  </div>
+
+  <div class="auth-container">
+    <div class="auth-logo">
+      <i class="fa-solid fa-shield-heart"></i>
+      <span>SafeHer<b>AI</b></span>
+    </div>
+
+    <!-- Tabs -->
+    <div class="auth-tabs">
+      <button class="tab-btn active" data-tab="login">Sign In</button>
+      <button class="tab-btn" data-tab="register">Register</button>
+    </div>
+
+    <!-- Login Form -->
+    <div id="login-form" class="auth-form">
+      <div class="form-group">
+        <label><i class="fa-solid fa-envelope"></i> Email</label>
+        <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email" />
+      </div>
+      <div class="form-group">
+        <label><i class="fa-solid fa-lock"></i> Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <button class="btn-primary" id="btn-login">
+        <i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In
+      </button>
+      <p id="login-error" class="form-error hidden"></p>
+    </div>
+
+    <!-- Register Form -->
+    <div id="register-form" class="auth-form hidden">
+      <div class="form-group">
+        <label><i class="fa-solid fa-user"></i> Full Name</label>
+        <input type="text" id="reg-name" placeholder="Your name" />
+      </div>
+      <div class="form-group">
+        <label><i class="fa-solid fa-envelope"></i> Email</label>
+        <input type="email" id="reg-email" placeholder="you@example.com" autocomplete="email" />
+      </div>
+      <div class="form-group">
+        <label><i class="fa-solid fa-lock"></i> Password</label>
+        <input type="password" id="reg-password" placeholder="Min 6 characters" autocomplete="new-password" />
+      </div>
+      <div class="form-group">
+        <label><i class="fa-solid fa-phone"></i> Phone (optional)</label>
+        <input type="tel" id="reg-phone" placeholder="+1 234 567 8900" />
+      </div>
+      <button class="btn-primary" id="btn-register">
+        <i class="fa-solid fa-user-plus"></i> Create Account
+      </button>
+      <p id="reg-error" class="form-error hidden"></p>
+    </div>
+
+    <p class="auth-note">🔒 Your data is encrypted and private.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     MAIN APP
+══════════════════════════════════════════════ -->
+<div id="app" class="hidden">
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <i class="fa-solid fa-shield-heart logo-icon"></i>
+      <span>SafeHer<b>AI</b></span>
+    </div>
+    <div class="topbar-right">
+      <div class="safe-status" id="safe-status">
+        <span class="status-dot"></span>
+        <span>Safe</span>
+      </div>
+      <button class="icon-btn" id="btn-logout" title="Sign out">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Page Container -->
+  <main class="page-container">
+
+    <!-- ── DASHBOARD PAGE ──────────────────────────────── -->
+    <section id="page-dashboard" class="page active">
+      <div class="page-scroll">
+
+        <div class="greeting-block">
+          <h2>Hello, <span id="user-greeting">Friend</span> 👋</h2>
+          <p>Stay safe. You're protected.</p>
+        </div>
+
+        <!-- SOS BUTTON -->
+        <div class="sos-wrapper">
+          <div class="sos-rings">
+            <div class="ring r1"></div>
+            <div class="ring r2"></div>
+            <div class="ring r3"></div>
+          </div>
+          <button id="sos-btn" class="sos-btn" aria-label="Emergency SOS">
+            <span class="sos-label">SOS</span>
+            <span class="sos-sub">Hold 3 sec</span>
+          </button>
+        </div>
+
+        <!-- SOS Timer Progress -->
+        <div id="sos-progress-wrap" class="sos-progress-wrap hidden">
+          <div class="sos-progress-bar" id="sos-progress-bar"></div>
+          <p>Hold to activate emergency… <span id="sos-countdown">3</span></p>
+        </div>
+        <div id="sos-active-banner" class="sos-active-banner hidden">
+          <i class="fa-solid fa-siren-on"></i>
+          <span>SOS ACTIVE — Alerting contacts & recording</span>
+          <button id="btn-cancel-sos">Cancel</button>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="section-title">Quick Actions</div>
+        <div class="quick-grid">
+          <button class="quick-card" data-nav="map">
+            <i class="fa-solid fa-map-location-dot"></i>
+            <span>Safe Route</span>
+          </button>
+          <button class="quick-card" data-nav="report">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Report Area</span>
+          </button>
+          <button class="quick-card" data-nav="ai">
+            <i class="fa-solid fa-robot"></i>
+            <span>AI Check</span>
+          </button>
+          <button class="quick-card" data-nav="contacts">
+            <i class="fa-solid fa-user-group"></i>
+            <span>Contacts</span>
+          </button>
+        </div>
+
+        <!-- Live Location Toggle -->
+        <div class="location-card">
+          <div class="location-card-left">
+            <i class="fa-solid fa-location-dot"></i>
+            <div>
+              <strong>Live Location Sharing</strong>
+              <small id="location-status-text">Tap to share with contacts</small>
+            </div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="location-toggle" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- Recent Alerts -->
+        <div class="section-title">Recent Community Alerts</div>
+        <div id="recent-alerts" class="alert-list">
+          <div class="alert-skeleton"></div>
+          <div class="alert-skeleton"></div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── MAP PAGE ──────────────────────────────────── -->
+    <section id="page-map" class="page">
+      <div class="map-controls">
+        <div class="map-search-bar">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="map-destination" placeholder="Enter destination for safe route…" />
+          <button id="btn-safe-route" class="btn-route">Go</button>
+        </div>
+        <div class="map-legend">
+          <span><i class="fa-solid fa-circle" style="color:#ff4d6d"></i> Unsafe</span>
+          <span><i class="fa-solid fa-circle" style="color:#00f5a0"></i> Safe</span>
+          <span><i class="fa-solid fa-circle" style="color:#ffd60a"></i> Caution</span>
+        </div>
+      </div>
+      <div id="map-container"></div>
+      <div id="route-info" class="route-info hidden">
+        <div class="route-info-header">
+          <i class="fa-solid fa-route"></i>
+          <strong>Safe Route Found</strong>
+          <button id="btn-close-route"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p id="route-details">Calculating safest route…</p>
+      </div>
+    </section>
+
+    <!-- ── REPORT PAGE ──────────────────────────────── -->
+    <section id="page-report" class="page">
+      <div class="page-scroll">
+        <div class="page-header">
+          <h3><i class="fa-solid fa-triangle-exclamation"></i> Report Unsafe Area</h3>
+          <p>Help keep your community safe by reporting hazards.</p>
+        </div>
+        <div class="form-card">
+          <div class="form-group">
+            <label>Type of Report</label>
+            <div class="chip-group" id="report-type-group">
+              <button class="chip active" data-val="harassment">😨 Harassment</button>
+              <button class="chip" data-val="dark_street">🌑 Dark Street</button>
+              <button class="chip" data-val="suspicious">👁️ Suspicious</button>
+              <button class="chip" data-val="assault">🚨 Assault</button>
+              <button class="chip" data-val="other">📌 Other</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label><i class="fa-solid fa-location-crosshairs"></i> Location</label>
+            <input type="text" id="report-location" placeholder="Address or describe location" />
+            <button class="btn-ghost small" id="btn-use-location">
+              <i class="fa-solid fa-crosshairs"></i> Use my current location
+            </button>
+          </div>
+          <div class="form-group">
+            <label><i class="fa-solid fa-pen"></i> Description</label>
+            <textarea id="report-desc" rows="3" placeholder="Briefly describe what happened or what you observed…"></textarea>
+          </div>
+          <div class="form-group">
+            <label><i class="fa-regular fa-clock"></i> Time of Incident</label>
+            <select id="report-time">
+              <option value="just_now">Just now</option>
+              <option value="within_hour">Within the last hour</option>
+              <option value="today">Earlier today</option>
+              <option value="yesterday">Yesterday</option>
+            </select>
+          </div>
+          <button class="btn-primary full" id="btn-submit-report">
+            <i class="fa-solid fa-paper-plane"></i> Submit Report
+          </button>
+          <p id="report-msg" class="form-msg hidden"></p>
+        </div>
+
+        <div class="section-title">Recent Reports Near You</div>
+        <div id="report-list" class="report-list">
+          <div class="alert-skeleton"></div>
+          <div class="alert-skeleton"></div>
+          <div class="alert-skeleton"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── COMMUNITY PAGE ───────────────────────────── -->
+    <section id="page-community" class="page">
+      <div class="page-scroll">
+        <div class="page-header">
+          <h3><i class="fa-solid fa-people-group"></i> Women's Safety Network</h3>
+          <p>Share tips, warnings, and support each other.</p>
+        </div>
+
+        <!-- New Post -->
+        <div class="post-composer">
+          <div class="composer-avatar"><i class="fa-solid fa-user"></i></div>
+          <div class="composer-body">
+            <textarea id="post-content" rows="2" placeholder="Share a safety tip, warning, or words of support…"></textarea>
+            <div class="composer-actions">
+              <div class="chip-group small" id="post-type-group">
+                <button class="chip active" data-val="tip">💡 Tip</button>
+                <button class="chip" data-val="warning">⚠️ Warning</button>
+                <button class="chip" data-val="support">💜 Support</button>
+              </div>
+              <button class="btn-primary small" id="btn-post">Post</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Feed -->
+        <div id="community-feed" class="community-feed">
+          <div class="alert-skeleton"></div>
+          <div class="alert-skeleton"></div>
+          <div class="alert-skeleton"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── AI CHECK PAGE ─────────────────────────────── -->
+    <section id="page-ai" class="page">
+      <div class="page-scroll">
+        <div class="page-header">
+          <h3><i class="fa-solid fa-robot"></i> AI Harassment Detector</h3>
+          <p>Paste a suspicious message and our AI will analyse it instantly.</p>
+        </div>
+
+        <div class="ai-card">
+          <div class="ai-icon-wrap">
+            <i class="fa-solid fa-brain"></i>
+          </div>
+          <div class="form-group">
+            <label>Paste the message below</label>
+            <textarea id="ai-message" rows="5" placeholder="Paste the message you received here…"></textarea>
+          </div>
+          <!-- OpenAI Key input (client-side MVP only) -->
+          <div class="form-group">
+            <label><i class="fa-solid fa-key"></i> OpenAI API Key <small>(stored locally only)</small></label>
+            <input type="password" id="openai-key" placeholder="sk-…" autocomplete="off" />
+            <small class="hint">Your key is never sent to our servers.</small>
+          </div>
+          <button class="btn-primary full" id="btn-ai-check">
+            <i class="fa-solid fa-magnifying-glass-chart"></i> Analyse Message
+          </button>
+          <div id="ai-result" class="ai-result hidden"></div>
+        </div>
+
+        <div class="ai-examples">
+          <div class="section-title">Try an example</div>
+          <button class="example-btn" data-msg="Hey, you look amazing today! Have a great day!">😊 Friendly message</button>
+          <button class="example-btn" data-msg="If you don't reply I know where you live and I will find you.">😰 Threatening message</button>
+          <button class="example-btn" data-msg="You're so stupid, nobody wants you around, just disappear.">😡 Abusive message</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── CONTACTS PAGE ─────────────────────────────── -->
+    <section id="page-contacts" class="page">
+      <div class="page-scroll">
+        <div class="page-header">
+          <h3><i class="fa-solid fa-user-shield"></i> Emergency Contacts</h3>
+          <p>These people will be alerted when you trigger SOS.</p>
+        </div>
+
+        <div class="form-card">
+          <h4>Add New Contact</h4>
+          <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="contact-name" placeholder="e.g. Mum, Best Friend" />
+          </div>
+          <div class="form-group">
+            <label>Phone Number</label>
+            <input type="tel" id="contact-phone" placeholder="+1 234 567 8900" />
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="contact-email" placeholder="their@email.com" />
+          </div>
+          <div class="form-group">
+            <label>Relationship</label>
+            <select id="contact-relation">
+              <option>Family</option>
+              <option>Friend</option>
+              <option>Partner</option>
+              <option>Colleague</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <button class="btn-primary full" id="btn-add-contact">
+            <i class="fa-solid fa-user-plus"></i> Add Contact
+          </button>
+          <p id="contact-msg" class="form-msg hidden"></p>
+        </div>
+
+        <div class="section-title">Your Contacts</div>
+        <div id="contacts-list" class="contacts-list">
+          <div class="alert-skeleton"></div>
+          <div class="alert-skeleton"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── PROFILE PAGE ──────────────────────────────── -->
+    <section id="page-profile" class="page">
+      <div class="page-scroll">
+        <div class="profile-hero">
+          <div class="profile-avatar">
+            <i class="fa-solid fa-user"></i>
+          </div>
+          <h3 id="profile-name">Loading…</h3>
+          <p id="profile-email">—</p>
+          <div class="profile-badge">
+            <i class="fa-solid fa-shield-check"></i> Verified Member
+          </div>
+        </div>
+
+        <div class="profile-stats">
+          <div class="stat-card">
+            <strong id="stat-reports">0</strong>
+            <span>Reports</span>
+          </div>
+          <div class="stat-card">
+            <strong id="stat-posts">0</strong>
+            <span>Posts</span>
+          </div>
+          <div class="stat-card">
+            <strong id="stat-contacts">0</strong>
+            <span>Contacts</span>
+          </div>
+        </div>
+
+        <div class="profile-actions">
+          <button class="profile-menu-item" data-nav="contacts">
+            <i class="fa-solid fa-user-group"></i> Emergency Contacts
+            <i class="fa-solid fa-chevron-right ml-auto"></i>
+          </button>
+          <button class="profile-menu-item" id="btn-profile-location">
+            <i class="fa-solid fa-location-dot"></i> Location Settings
+            <i class="fa-solid fa-chevron-right ml-auto"></i>
+          </button>
+          <button class="profile-menu-item" id="btn-about">
+            <i class="fa-solid fa-circle-info"></i> About SafeHer AI
+            <i class="fa-solid fa-chevron-right ml-auto"></i>
+          </button>
+          <button class="profile-menu-item danger" id="btn-logout-profile">
+            <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+            <i class="fa-solid fa-chevron-right ml-auto"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Bottom Navigation -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-nav="dashboard">
+      <i class="fa-solid fa-house"></i>
+      <span>Home</span>
+    </button>
+    <button class="nav-item" data-nav="map">
+      <i class="fa-solid fa-map"></i>
+      <span>Map</span>
+    </button>
+    <button class="nav-item" data-nav="community">
+      <i class="fa-solid fa-people-group"></i>
+      <span>Community</span>
+    </button>
+    <button class="nav-item" data-nav="ai">
+      <i class="fa-solid fa-robot"></i>
+      <span>AI Check</span>
+    </button>
+    <button class="nav-item" data-nav="profile">
+      <i class="fa-solid fa-user"></i>
+      <span>Profile</span>
+    </button>
+  </nav>
+
+</div>
+
+<!-- ═══════════════════════════════════════════
+     MODALS
+══════════════════════════════════════════════ -->
+
+<!-- SOS Triggered Modal -->
+<div id="modal-sos" class="modal hidden">
+  <div class="modal-content sos-modal">
+    <div class="modal-sos-icon">
+      <i class="fa-solid fa-siren-on"></i>
+    </div>
+    <h2>SOS Activated!</h2>
+    <p>We are notifying your emergency contacts and sharing your location.</p>
+    <div class="sos-actions-list" id="sos-actions-list">
+      <div class="sos-action-item" id="sa-location">
+        <i class="fa-solid fa-spinner fa-spin"></i> Capturing location…
+      </div>
+      <div class="sos-action-item" id="sa-contacts">
+        <i class="fa-solid fa-spinner fa-spin"></i> Alerting contacts…
+      </div>
+      <div class="sos-action-item" id="sa-recording">
+        <i class="fa-solid fa-spinner fa-spin"></i> Starting audio recording…
+      </div>
+    </div>
+    <button class="btn-danger full mt-1" id="btn-modal-cancel-sos">Cancel SOS</button>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div id="toast" class="toast hidden"></div>
+
+<!-- About Modal -->
+<div id="modal-about" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-shield-heart"></i> About SafeHer AI</h3>
+      <button class="modal-close" data-modal="modal-about"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="about-content">
+      <p><strong>SafeHer AI</strong> is a mobile-first safety platform designed to empower women with AI-powered tools to stay safe online and offline.</p>
+      <ul>
+        <li>🚨 Emergency SOS with location sharing</li>
+        <li>📍 Live location tracking</li>
+        <li>🗺️ Safe route suggestions</li>
+        <li>📣 Community safety network</li>
+        <li>🤖 AI message analysis</li>
+        <li>👥 Emergency contacts</li>
+      </ul>
+      <p style="margin-top:1rem;color:var(--text-muted);font-size:0.85rem;">Version 1.0.0 MVP · Built with ❤️</p>
+    </div>
+  </div>
+</div>
+
+<!-- Google Maps Script (replace YOUR_MAPS_KEY) -->
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=YOUR_MAPS_API_KEY&libraries=places,geometry&callback=initMap">
+</script>
+
+<script src="app.js"></script>
+</body>
+</html>
